@@ -1,4 +1,4 @@
-/* ===== colors.js — игра «жёлтый и зелёный» (самостоятельная) ===== */
+/* ===== colors-rb.js — игра «красный и синий» (самостоятельная) ===== */
 
 /* ===== Экран загрузки: собака-сёрфер (адаптивный) ===== */
 (function(){
@@ -115,7 +115,7 @@
 })();
 
 
-/* ===== основная логика игры ===== */
+/* ===== основная логика игры (red/blue) ===== */
 (function(){
 
 /* ─── РЕПОЗИТОРИИ ─── */
@@ -147,29 +147,72 @@ const COLORS = {
   brown:     ['1560','1562','1563','1564','1566','1567'],
   white:     ['1569','1571','1573','1574','1575','1577']
 };
-const LEARN = ['yellow','green'];  // этап 1 → жёлтый, этап 2 → зелёный
-/* запрещённые (визуально похожие) соседние пары */
+/* ═══════════ ЕДИНАЯ ТАБЛИЦА АССЕТОВ ПО ВСЕМ 12 ЦВЕТАМ ═══════════
+   Новая игра на цвета = задать пару в HTML-шелле:
+     window.SG_LEARN = ['orange','purple'];
+   и адрес следующей игры: window.SG_NEXT_URL = '...'.
+   Больше в JS менять ничего не нужно.                              */
+
+/* клякса: имя файла в репозитории (у ярких .JPG, у тёмных .png) */
+const KLYAKSA_FILE = {
+  yellow:'Yellow.JPG', green:'Green.JPG', red:'Red.JPG', blue:'Blue.JPG',
+  orange:'Orange.JPG', purple:'Purple.JPG', pink:'Pink.JPG', lightblue:'Lightblue.JPG',
+  gray:'Gray.png', black:'Black.png', brown:'Brown.png', white:'White.png'
+};
+/* раскраски (этап 3, в.3–4): [номер1, номер2]; половинка IMG_<n>.<ext>, полная <n>.<ext> */
+const PAINT_ALL = {
+  yellow:['1621','1622'], green:['1623','1624'], red:['1625','1626'], blue:['1627','1628'],
+  orange:['1619','1620'], purple:['1629','1630'], pink:['1633','1634'], lightblue:['1631','1632'],
+  gray:['1641','1642'], brown:['1637','1638'], black:['1635','1636'], white:['1639','1640']
+};
+/* расширение половинок/полных, если не png (у 1636 — .JPG) */
+const PAINT_EXT = { '1636':'JPG' };
+/* банка + жук (этап 3, в.5): номер — банка IMG_<n>.png, жук <n>.png */
+const BANK_NUM = {
+  yellow:'1585', green:'1586', red:'1587', blue:'1588', pink:'1596', lightblue:'1597',
+  orange:'1602', purple:'1603', brown:'1604', gray:'1605', white:'1606', black:'1611'
+};
+/* аудио 1..5: ТОЧНЫЕ имена файлов (без .m4a) — как лежат на гитхабе */
+const AUDIO_ALL = {
+  yellow:['1yel','2yel','3yel','4yel','5yel'],
+  green: ['1green','2green','3green','4green','5green'],
+  red:   ['1red','2red','3red','4red','5red'],
+  blue:  ['1blue','2blue','3blue','4blue','5blue'],
+  orange:['1ora','2ora','3ora','4ora','5ora'],
+  purple:['1per','2per','3per','4pur','5pur'],
+  pink:  ['1Pink','2pink','3pink','4pink','5pink'],
+  lightblue:['1lig','2light','3light','4light','5tight'],
+  gray:  ['1gray','2gray','3gray','4gray','5gray'],
+  brown: ['1brow','2brow','3brow','4brow','5brow'],
+  black: ['1black','2black','3black','4black','5black'],
+  white: ['1white','2white','3white','4white','5white']
+};
+
+/* ◀━━ КАКИЕ ДВА ЦВЕТА УЧИМ (берётся из шелла; по умолчанию красный+синий) ━━▶ */
+const LEARN = (Array.isArray(window.SG_LEARN) && window.SG_LEARN.length===2)
+  ? window.SG_LEARN.slice() : ['red','blue'];
+
+/* запрещённые (визуально похожие) соседние пары — не показываем как отвлечение */
 const FORBIDDEN = [['lightblue','blue'],['white','gray'],['gray','black'],['brown','orange']];
 
-const KLYAKSA = { yellow: BASE+'Yellow.JPG', green: BASE+'Green.JPG' };
+/* ─── производные для двух цветов текущей игры ─── */
+const KLYAKSA = {}; LEARN.forEach(c => KLYAKSA[c] = BASE + KLYAKSA_FILE[c]);
+const PAINT   = {}; LEARN.forEach(c => PAINT[c]   = PAINT_ALL[c]);
+const JAR = {}, BUG = {};
+LEARN.forEach(c => { JAR[c] = BASE+'IMG_'+BANK_NUM[c]+'.png'; BUG[c] = BASE+BANK_NUM[c]+'.png'; });
+function otherLearn(c){ return c===LEARN[0] ? LEARN[1] : LEARN[0]; }
 
-/* раскраски (этап 3, в.3–4): половинки IMG_16xx.png, полные 16xx.png */
-const PAINT = { yellow: ['1621','1622'], green: ['1623','1624'] };
-
-/* банки + жуки (этап 3, в.5) */
-const JAR = { yellow: BASE+'IMG_1585.png', green: BASE+'IMG_1586.png' };
-const BUG = { yellow: BASE+'1585.png',     green: BASE+'1586.png' };
-
-/* зона внутри банки для жуков (% от рамки картинки банки) — по красной разметке, стекло без крышки */
+/* зона внутри банки для жуков (% от рамки картинки банки) — стекло без крышки */
 const BUG_ZONE = { x0:0.06, x1:0.94, y0:0.24, y1:0.95 };
 
 const ABA_STEPS = 4;   // вопросов на этапах 1 и 2
 
 /* ─── URL-хелперы ─── */
+function paintExt(num){ return PAINT_EXT[num] || 'png'; }
 function objImg(num){ return BASE + 'IMG_' + num + '.png'; }
-function paintHalf(num){ return BASE + 'IMG_' + num + '.png'; }
-function paintFull(num){ return BASE + num + '.png'; }
-function colorAudio(n, color){ return BASE + n + (color==='yellow'?'yel':'green') + '.m4a'; }
+function paintHalf(num){ return BASE + 'IMG_' + num + '.' + paintExt(num); }
+function paintFull(num){ return BASE + num + '.' + paintExt(num); }
+function colorAudio(n, color){ return BASE + AUDIO_ALL[color][n-1] + '.m4a'; }
 const CONNECT_URL = BASE + 'Connect.m4a';
 
 /* ─── ОТВЛЕКАШКИ (репозиторий Otvlekashki) ─── */
@@ -260,15 +303,15 @@ function playFanfare()           { playEffect('fanfare.wav'); }
 /* ─── PRELOAD: essential блокирует старт, остальное грузится фоном ─── */
 const keepImgs = [];
 
-const ESS_IMGS = [KLYAKSA.yellow, KLYAKSA.green, STAR_URL, JAR.yellow, JAR.green, BUG.yellow, BUG.green];
-COLORS.yellow.forEach(n => ESS_IMGS.push(objImg(n)));
-COLORS.green.forEach(n => ESS_IMGS.push(objImg(n)));
-['yellow','green'].forEach(c => PAINT[c].forEach(n => ESS_IMGS.push(paintHalf(n), paintFull(n))));
+const ESS_IMGS = [STAR_URL];
+LEARN.forEach(c => { ESS_IMGS.push(KLYAKSA[c], JAR[c], BUG[c]); });
+LEARN.forEach(c => COLORS[c].forEach(n => ESS_IMGS.push(objImg(n))));
+LEARN.forEach(c => PAINT[c].forEach(n => ESS_IMGS.push(paintHalf(n), paintFull(n))));
 const essImgs = [...new Set(ESS_IMGS)];
 
 function essAudioUrls(){
   const s = new Set();
-  ['yellow','green'].forEach(c => { [1,2,3,4,5].forEach(n => s.add(colorAudio(n,c))); });
+  LEARN.forEach(c => { [1,2,3,4,5].forEach(n => s.add(colorAudio(n,c))); });
   s.add(CONNECT_URL);
   PRAISE_FILES.forEach(f => s.add(BASE2 + f));
   ['correct.wav','wrong.wav','distractor correct.wav','stage complete.wav','fanfare.wav'].forEach(f => s.add(DBASE + encodeURIComponent(f)));
@@ -300,7 +343,7 @@ essImgs.forEach(u => { const im=new Image(); im.onload=im.onerror=tick; im.src=u
 
 /* фоновая догрузка (не блокирует старт): остальные цвета, отвлекашки, музыка */
 function backgroundLoad(){
-  Object.keys(COLORS).forEach(c => { if(c!=='yellow' && c!=='green') COLORS[c].forEach(n => { const im=new Image(); im.src=objImg(n); keepImgs.push(im); }); });
+  Object.keys(COLORS).forEach(c => { if(!LEARN.includes(c)) COLORS[c].forEach(n => { const im=new Image(); im.src=objImg(n); keepImgs.push(im); }); });
   DISTRACTORS.forEach(d => {
     if(d.type==='tap_wiggle' || d.type==='sound_auto'){
       const im=new Image(); im.src=DBASE+(d.imgName||d.name)+'.png'; keepImgs.push(im);
@@ -320,7 +363,7 @@ function shuffle(a){ return [...a].sort(()=>Math.random()-.5); }
 
 /* ─── СОСТОЯНИЕ ─── */
 let currentStage = 0;      // 0 жёлтый, 1 зелёный, 2 — этап 3
-let curColor     = 'yellow';
+let curColor     = LEARN[0];
 let abaStep      = 0;
 let scoreCorrect = 0, scoreWrong = 0;
 let answered     = false;
@@ -380,8 +423,8 @@ function pickFrom(color){
 }
 function isForbidden(a,b){ return FORBIDDEN.some(p => (p[0]===a&&p[1]===b)||(p[0]===b&&p[1]===a)); }
 function pickDistractorColor(target){
-  const otherLearn = target==='yellow' ? 'green' : 'yellow';
-  const cand = Object.keys(COLORS).filter(c => c!==target && c!==otherLearn && !isForbidden(c,target));
+  const otherC = otherLearn(target);
+  const cand = Object.keys(COLORS).filter(c => c!==target && c!==otherC && !isForbidden(c,target));
   return cand[Math.floor(Math.random()*cand.length)];
 }
 
@@ -466,20 +509,24 @@ function learnStageComplete(){
 
 /* ═══════════ ЭТАП 3 ═══════════ */
 function buildStage3Plan(){
-  const showOrder  = shuffle(['yellow','green']);
-  const paintOrder = shuffle(['yellow','green']);
-  const ys = shuffle(PAINT.yellow);
-  const gs = shuffle(PAINT.green);
+  const a=LEARN[0], b=LEARN[1];
+  const showOrder = shuffle([a,b]);
+  const A = shuffle(PAINT[a]);
+  const B = shuffle(PAINT[b]);
+  const paintSteps = shuffle([
+    { type:'paint', color:a, own:A[0], other:B[0] },
+    { type:'paint', color:b, own:B[1], other:A[1] }
+  ]);
   return [
     { type:'show',  color:showOrder[0] },
     { type:'show',  color:showOrder[1] },
-    { type:'paint', color:paintOrder[0], y:ys[0], g:gs[0] },
-    { type:'paint', color:paintOrder[1], y:ys[1], g:gs[1] },
+    paintSteps[0],
+    paintSteps[1],
     { type:'banks' }
   ];
 }
 function beginStage3(){
-  currentStage=2; curColor='yellow'; isRelearn=false;
+  currentStage=2; curColor=LEARN[0]; isRelearn=false;
   stage3Plan = buildStage3Plan(); stage3Idx=0;
   updateProgressStage3();
   runStage3Step();
@@ -502,23 +549,23 @@ function stage3Complete(){
 function stage3Error(which){
   if(phase==='banks') clearBanks();
   abaStep=0;
-  if(which==='yellow') relearnQueue=[0];
-  else if(which==='green') relearnQueue=[1];
+  if(which===LEARN[0]) relearnQueue=[0];
+  else if(which===LEARN[1]) relearnQueue=[1];
   else relearnQueue=[0,1];
   isRelearn=true;
   playVoice(BASE2 + 'Rock12.m4a', ()=> beginLearnStage(relearnQueue[0], true));   // «попробуй ещё раз», затем доучиваем неверный цвет
 }
 
-/* этап 3, в.1–2: две кляксы, «покажи жёлтый/зелёный» */
+/* этап 3, в.1–2: две кляксы, «покажи красный/синий» */
 function showColorShowQuestion(step){
   phase='q'; answered=false; curColor=step.color;
   showPane('cards'); resetCards();
   correctPos = Math.random()<.5 ? 0 : 1;
   setCardImg(correctPos, KLYAKSA[step.color]);
-  setCardImg(1-correctPos, KLYAKSA[step.color==='yellow'?'green':'yellow']);
+  setCardImg(1-correctPos, KLYAKSA[otherLearn(step.color)]);
   unlockCards();
   updateProgressStage3();
-  playColor(5, step.color);   // «покажи жёлтый цвет» (клякса)
+  playColor(5, step.color);   // «покажи красный/синий цвет» (клякса)
 }
 function onStage3ShowAnswer(pos){
   if(answered || phase!=='q') return;
@@ -537,19 +584,19 @@ function showPaintQuestion(step){
   phase='paint'; answered=false; curColor=step.color; curPaint=step;
   showPane('cards'); resetCards();
   correctPos = Math.random()<.5 ? 0 : 1;
-  const askNum   = step.color==='yellow' ? step.y : step.g;
-  const otherNum = step.color==='yellow' ? step.g : step.y;
+  const askNum   = step.own;
+  const otherNum = step.other;
   setCardImg(correctPos, paintHalf(askNum));
   setCardImg(1-correctPos, paintHalf(otherNum));
   unlockCards();
   updateProgressStage3();
-  playColor(3, step.color);   // «раскрась жёлтый/зелёный»
+  playColor(3, step.color);   // «раскрась красный/синий»
 }
 function onPaintAnswer(pos){
   if(answered || phase!=='paint') return;
   answered=true; lockCards();
   if(pos===correctPos){
-    const askNum = curColor==='yellow' ? curPaint.y : curPaint.g;
+    const askNum = curPaint.own;
     setCardImg(pos, paintFull(askNum));   // закрашиваем полностью, без зелёной рамки
     playCorrect(); scoreCorrect++; updateScore();
     playPraise(()=>{ resetCards(); stage3Advance(); });
@@ -601,14 +648,14 @@ function buildBanks(){
   bugs=[]; jars=[]; parkedCount=0; banksBusy=false; bugDrag=null;
   const mob=isMobile();
   const jarW = mob?34:17, jarY = mob?76:74, leftX = mob?27:31, rightX = mob?73:69;
-  const order = Math.random()<.5 ? ['yellow','green'] : ['green','yellow'];
+  const order = Math.random()<.5 ? [LEARN[0],LEARN[1]] : [LEARN[1],LEARN[0]];
   const jarX = [leftX, rightX];
   order.forEach((color,i)=>{
     const el=document.createElement('img'); el.className='sg-jar'; el.src=JAR[color];
     el.style.left=jarX[i]+'%'; el.style.top=jarY+'%'; el.style.width=jarW+'%'; el.setAttribute('draggable','false');
     scene.appendChild(el); jars.push({ color, el, filled:0 });
   });
-  const bugColors = shuffle(['yellow','yellow','yellow','green','green','green']);
+  const bugColors = shuffle([LEARN[0],LEARN[0],LEARN[0],LEARN[1],LEARN[1],LEARN[1]]);
   const bugW = mob?22:9;
   const cols = mob?[24,50,76]:[26,50,74];
   const rows = mob?[11,29]:[9,26];
